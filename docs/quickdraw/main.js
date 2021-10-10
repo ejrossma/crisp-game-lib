@@ -167,7 +167,7 @@ function update() {
         //player didn't click a target in time
         end();
         //play lose sound
-        play("lucky");
+        play("select");
       } else {
         t.upTime--;
       }
@@ -218,7 +218,7 @@ function update() {
   if (!oneTargetWasHit && input.isJustPressed) {
     end();
     //play lose sound
-    play("lucky");
+    play("select");
   }
 
   oneTargetWasHit = false;

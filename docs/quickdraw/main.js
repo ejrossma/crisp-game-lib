@@ -47,9 +47,9 @@ const G = {
   DUSTBALL_ROTATION_SPD: 0.1,
 
   TARGET_WAITTIME_MIN: 30, //quarter of a second
-  TARGET_WAITTIME_MAX: 60, //3 quarters of a second
-  TARGET_UPTIME_MIN: 180, //1 and a half seconds
-  TARGET_UPTIME_MAX: 240 //2 and a half seconds
+  TARGET_WAITTIME_MAX: 90, //3 quarters of a second
+  TARGET_UPTIME_MIN: 240, //1 and a half seconds
+  TARGET_UPTIME_MAX: 300 //2 and a half seconds
 
 };
 
@@ -57,7 +57,8 @@ options = {
   viewSize: {x: G.WIDTH, y: G.HEIGHT},
   theme:"dark",
   isPlayingBgm: true,
-  seed: 1
+  seed: 2,
+  isReplayEnabled: true
 };
 
 /**
@@ -102,6 +103,8 @@ let targetsHit;
 function update() {
   //init
   if (!ticks) {
+    //variable for how many targets are hit
+    targetsHit = 0;
     //dustball initialization
     var count = 5;
     dustballs = times(10, () => {
@@ -115,23 +118,21 @@ function update() {
     });
 
     targets = times(5, () => {
-      const posX = rnd(6, G.WIDTH - 6);
-      const posY = rnd(6, G.HEIGHT - 6);
-      const timeUntilLose = rnd(G.TARGET_UPTIME_MIN, G.TARGET_UPTIME_MAX);
+      const posX = rnd(12, G.WIDTH - 12);
+      const posY = rnd(12, G.HEIGHT - 12);
+      const timeUntilLose = rnd(G.TARGET_UPTIME_MIN, G.TARGET_UPTIME_MAX) - targetsHit;
       var tm = {
         pos: vec(posX, posY - 4),
         remainingTime: timeUntilLose
       }
       return {
         pos: vec(posX, posY),
-        waitTime: rnd(G.TARGET_WAITTIME_MIN, G.TARGET_WAITTIME_MAX),
+        waitTime: rnd(G.TARGET_WAITTIME_MIN, G.TARGET_WAITTIME_MAX) - targetsHit,
         upTime: timeUntilLose,
         timeMeter: tm
       };
     });
-
-    targetsHit = 0;
-    
+    var oneTargetWasHit = false;
 
   }
   color("black");
@@ -152,8 +153,8 @@ function update() {
       char("a", t.pos);
       //handle bar above target
       t.timeMeter.remainingTime--;
-      var temp = t.timeMeter.remainingTime/15;
-      if (t.timeMeter.remainingTime < 15 && t.timeMeter.remainingTime > 0) {
+      var temp = t.timeMeter.remainingTime/20;
+      if (t.timeMeter.remainingTime < 20 && t.timeMeter.remainingTime > 0) {
         temp = 1
       } else if (t.timeMeter.remainingTime < 0) {
         color("transparent");
@@ -180,23 +181,45 @@ function update() {
   remove(targets, (t) => {
     //ready to be shot
     color("transparent");
-    var isCollidingWithTarget = box(input.pos, 1).isColliding.char.a;
-    if (input.isJustPressed && isCollidingWithTarget) {
+    let iPos = input.pos;
+    //find the nearest target
+    var isNearest;
+    if (abs(t.pos.x - iPos.x) < 3 && abs(t.pos.y - iPos.y) < 3) isNearest = true;
+    const isCollidingWithTarget = box(iPos, 1).isColliding.char.a;
+    if (input.isJustPressed && isCollidingWithTarget && isNearest) {
       //player clicked on target
       color("yellow");
       particle(t.pos);
       addScore(10 + (5 * targetsHit), t.pos);
       targetsHit++;
       play("hit");
+      oneTargetWasHit = true;
+
+      //make new target before destroying
+      const posX = rnd(6, G.WIDTH - 6);
+      const posY = rnd(6, G.HEIGHT - 6);
+      const timeUntilLose = rnd(G.TARGET_UPTIME_MIN, G.TARGET_UPTIME_MAX) - targetsHit;
+      var tm = {
+        pos: vec(posX, posY - 4),
+        remainingTime: timeUntilLose
+      }
+      targets.push({
+        pos: vec(posX, posY),
+        waitTime: rnd(G.TARGET_WAITTIME_MIN, G.TARGET_WAITTIME_MAX) - targetsHit,
+        upTime: timeUntilLose,
+        timeMeter: tm
+      });
+
       return true;
     }
     return false;
   });
 
-  //when I click on a target it removes all targets
-  // remove(targets, (t) => {
-  //   color("transparent");
-  //   const isCollidingWithTarget = box(input.pos, 1).isColliding.char.a;
-  //   return isCollidingWithTarget && input.isJustPressed;
-  // });
+  if (!oneTargetWasHit && input.isJustPressed) {
+    end();
+    //play lose sound
+    play("lucky");
+  }
+
+  oneTargetWasHit = false;
 }

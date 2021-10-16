@@ -331,6 +331,7 @@ function update() {
           let targetCenter = vec(G.PARADIST + relativeX, target.y);
           distance = puck.pos.distanceTo(targetCenter);
           let score = 500 - distance - (floor(distance/target.innerRadius) * distance);
+          clamp(score, 0, 1000);
           if ((floor(distance/target.innerRadius) == 0)) { myAddScore(score * 2); } else { myAddScore(score); }
           //100 - distance - (floor(distance/innerRadius) * distance) - (floor(distance/outerRadius) * distance)
             //inner radius gets 2x multiplier

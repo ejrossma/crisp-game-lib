@@ -34,19 +34,27 @@ const G = {
   
   PUCKANGLE: 0.01,
   DIRLENGTH: 25,
-  PUCKANGLEMAX: Math.PI/4,
-  PUCKANGLEMIN: -Math.PI/4,
+  PUCKANGLEMAX: PI/4,
+  PUCKANGLEMIN: -PI/4,
 
   PUCKSPEEDMAX: 2,
   PUCKSPEEDMIN: 1,
 
   PUCKDECCELERATION: 0.002,
 
+  METER: 60,
   PARADIST: 100,
 }
 // PUCK VERT is the speed the Puck moves up and down in vertical selection
 // PUCK ANGLE is the speed the angle moves up and down in angle selection
 // PUCK SPEED is the max/min horizontal speed (it controls our power bar width and our puck speed)
+
+// WITH OUR CURRENT NUMBERS
+// MAX POWER GOES 16m unaided + unimpeded
+// MIDDLE POWER GOES 9m unaided + unimpeded
+// MIN POWER GOES 4m unaided + unimpeded
+// The average distance at 9 (max) objects  is 14m
+// The average distance at 3 (min) objects is 6m
 
 const STATE = {
   POSITION: 0,
@@ -92,7 +100,6 @@ let puck;
  */
 let objects;
 
-
 /**
  * @typedef {{
  * trueX: number
@@ -106,6 +113,11 @@ let objects;
  * @type { targetObj }
  */
 let target;
+
+/**
+ * @type { Vector []}
+ */
+let lines;
 
 /**
  * @typedef {{
@@ -133,12 +145,32 @@ let distance; //distance from target
 
 function update() {
   if (!ticks) {
+    /* let trials = 0
+    let sample = 0
+    while (trials < 122){
+      let multiplier = 1;
+      if(sample <= 14){
+        multiplier = 1.5
+      } else if(sample <= 28){
+        multiplier = 1
+      } else if(sample <= 60){
+        multiplier = 0.5
+      } else {
+        multiplier = 0
+      }
+      let score = 500 - sample * 8
+      score *= multiplier
+      console.log("Distance: " + sample + ", Score: " + score + " Multiplier: " + multiplier)
+      trials += 1
+      sample += 0.5
+    } */
     distance = -1;
 
-    let x = 50;
-    objects = times(rndi(5, 10), () => {
+    let x = G.PARADIST;
+    objects = times(rndi(3, 9), () => {
       let y = rndi(13, 67)
-      x += rndi(60,120)
+      
+      x += rndi(G.WIDTH/5,G.WIDTH/2)
       return {
         trueX: x,
         y: y,
@@ -146,8 +178,14 @@ function update() {
       }
     });
 
+    lines = times(3, () => {
+      let y = rndi(20, 60)
+      let x = rndi(40,160)
+      return vec(x,y);
+    });
+
     target = {
-      trueX: x + 100,
+      trueX: (ceil((x + 50)/G.METER)*G.METER) + 20,
       y: G.HEIGHT/2,
       innerRadius: 14,
       outerRadius: 28
@@ -169,10 +207,45 @@ function update() {
     }
   }
 
+  color('light_red');
+  if (puck.trueX <= G.PARADIST){
+    line(20,0, 20,80, 2);
+  } else if (puck.trueX <= G.PARADIST + 20){
+    let x = G.PARADIST + 20 - puck.trueX;
+    line(x, 0, x,80);
+  }
+
+  color('light_yellow')
+  if (puck.trueX <= G.PARADIST){
+    line(140,0,140,80,2);
+  } else {
+    if (puck.trueX >= G.PARADIST + 20){
+      let line1 = (floor((puck.trueX - 20)/ 120) * 120) + 20
+      let relative1 = line1 - puck.trueX 
+      line(G.PARADIST + relative1, 0 ,G.PARADIST + relative1, 80)
+    }
+    let line2 = (ceil((puck.trueX - 20)/ 120) * 120) + 20
+    let relative2 = line2 - puck.trueX 
+    line(G.PARADIST + relative2, 0 ,G.PARADIST + relative2, 80)
+  }
+
   // WALLS
   color('light_cyan');
   rect(0, 0, G.WIDTH, G.PUCKPOSMIN - 3);
   rect(0, G.PUCKPOSMAX + 3, G.WIDTH, G.HEIGHT - G.PUCKPOSMAX - 3);
+
+  if (puck.speed >= 0.6 && puck.state == STATE.FREE){
+    color("light_black")
+    lines.forEach((v) => {
+
+      line(v.x, v.y, v.x + 40 * ((pow(puck.speed,1.5))/2), v.y, 0.5);
+      v.x -= puck.speed*2 + 1
+      if (v.x <= -40 * ((puck.speed)/2)){
+        v.x = wrap(v.x, -40 * ((puck.speed)/2), G.WIDTH)
+        v.y = rndi(20,60)
+      }
+    })
+  }
 
   //draw target
   let relativeX = target.trueX - puck.trueX 
@@ -189,7 +262,7 @@ function update() {
 
   color("black");
   remove(objects, (o) => {
-    let relativeX = o.trueX - puck.trueX 
+    let relativeX = o.trueX - Math.max(G.PARADIST, puck.trueX) 
     let disappear = (G.PARADIST + relativeX <= 0 - o.radius);
     if (relativeX - o.radius <= G.WIDTH - G.PARADIST){
       var collider = char("b", G.PARADIST + relativeX, o.y).isColliding;
@@ -207,7 +280,7 @@ function update() {
   color("black");
   text(`SHOTS LEFT: ${puck.lives}`, vec(G.WIDTH/2 - 37, 4));
 
-  if (distance == -1) { text(`DIST: ${floor(10 * (target.trueX - puck.trueX)/60)/10}m`, 5, G.HEIGHT - 5); }
+  if (distance == -1) { text(`DIST: ${floor(10 * (target.trueX - puck.trueX)/G.METER)/10}m`, 5, G.HEIGHT - 5); }
 
   switch (puck.state) {
     case STATE.POSITION:
@@ -223,6 +296,7 @@ function update() {
       if (input.isJustPressed) {
         // do set position
         // switch to STATE.ANGLE
+        play("select");
         puck.lives--;
         puck.state = STATE.ANGLE;
       }
@@ -235,8 +309,8 @@ function update() {
       } else {
         puck.angle -= G.PUCKANGLE;
       }
-      puck.target.x = puck.pos.x + Math.cos(puck.angle)*G.DIRLENGTH;
-      puck.target.y = puck.pos.y + Math.sin(puck.angle)*G.DIRLENGTH;
+      puck.target.x = puck.pos.x + cos(puck.angle)*G.DIRLENGTH;
+      puck.target.y = puck.pos.y + sin(puck.angle)*G.DIRLENGTH;
       color("light_black");
       line(puck.pos, puck.target, 1);
       if (puck.angle > G.PUCKANGLEMAX || puck.angle < G.PUCKANGLEMIN || puck.target.y > G.PUCKPOSMAX+3 || puck.target.y < G.PUCKPOSMIN-3){
@@ -247,6 +321,7 @@ function update() {
         // reset puck.reverse for use in STATE.POWER
         puck.reverse = true;
         // switch to STATE.POWER
+        play("select");
         puck.state = STATE.POWER;
       }
     break;
@@ -274,6 +349,7 @@ function update() {
       if (input.isJustPressed) {
         // puck.speed is auto setup above!
         // switch to STATE.FREE
+        play("select");
         puck.state = STATE.FREE;
       }
     break;
@@ -301,8 +377,8 @@ function update() {
         }
       }
 
-      puck.target.x = Math.cos(puck.angle)* (puck.speed);
-      puck.target.y = Math.sin(puck.angle)* (puck.speed);
+      puck.target.x = cos(puck.angle)* (puck.speed);
+      puck.target.y = sin(puck.angle)* (puck.speed);
       // POSSIBLE PARALLAX EFFECT IF WE WANT A LANE LONGER THAN 200 PIXELS
       puck.pos.y += puck.target.y;
       puck.trueX += puck.target.x;
@@ -327,17 +403,31 @@ function update() {
       if (!puck.receivedScore) {
         let relativeX = target.trueX - puck.trueX;
         //if target is on screen
-        if (relativeX - target.outerRadius <= G.WIDTH - G.PARADIST) {
+        if (relativeX - target.outerRadius <= G.WIDTH - G.PARADIST && relativeX >= -G.PARADIST - target.outerRadius) {
           let targetCenter = vec(G.PARADIST + relativeX, target.y);
           distance = puck.pos.distanceTo(targetCenter);
-          let score = 500 - distance - (floor(distance/target.innerRadius) * distance);
-          clamp(score, 0, 1000);
-          if ((floor(distance/target.innerRadius) == 0)) { myAddScore(score * 2); play("lucky"); } else { myAddScore(score); play("coin"); }
-          //100 - distance - (floor(distance/innerRadius) * distance) - (floor(distance/outerRadius) * distance)
-            //inner radius gets 2x multiplier
+          let multiplier = 0;
+          if(distance <= target.innerRadius){
+            multiplier = 1.5
+          } else if(distance <= target.outerRadius){
+            multiplier = 1
+          } else if(distance <= G.METER){
+            multiplier = 0.5
           }
-          puck.receivedScore = true;
+          let score = 500 - distance * 8
+          score *= multiplier
+          score = clamp(score, 0, 750);
+          if (multiplier > 0){
+            myAddScore(score, G.WIDTH/2, 20, "yellow")
+            if (multiplier > 1){
+              play("lucky")
+            } else {
+              play("coin")
+            }
+          }
+        } 
       }
+      puck.receivedScore = true;
       //wait for player to click for next shot if they have lives left
       color("black");
       if (puck.lives > 0) {
@@ -345,7 +435,7 @@ function update() {
         rect(G.WIDTH/2 - 60, G.HEIGHT - 20, 120, 10);
         color("black");
         text("CLICK FOR NEXT SHOT", G.WIDTH/2 - 55, G.HEIGHT - 15);
-        if (distance != -1) { text(`YOU WERE ${floor(100 * (distance/60))/100}m AWAY!`, G.WIDTH/2 - 50, G.HEIGHT/2); };
+        if (distance != -1) { text(`YOU WERE ${floor(100 * (distance/G.METER))/100}m AWAY!`, G.WIDTH/2 - 50, G.HEIGHT/2); };
       } else {
         end("YOU FINISHED!!");
       }
@@ -365,10 +455,10 @@ function update() {
       
         //empty and repopulate objects array
         objects = [];
-        let x = 50;
-        objects = times(rndi(5, 10), () => {
+        let x = G.PARADIST;
+        objects = times(rndi(3, 9), () => {
           let y = rndi(13, 67)
-          x += rndi(60,120)
+          x += rndi(G.WIDTH/5,G.WIDTH/2)
           return {
             trueX: x,
             y: y,
@@ -377,7 +467,7 @@ function update() {
         });
 
         //reset target value
-        target.trueX = x + 100;
+        target.trueX = (ceil((x + 50)/G.METER)*G.METER) + 20;
 
         //change to position state
         puck.state = STATE.POSITION;

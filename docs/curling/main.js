@@ -123,8 +123,8 @@ let scores;
 
 options = {
   viewSize: {x: G.WIDTH, y: G.HEIGHT},
-  //seed: 3,
-  //isPlayingBgm: true,
+  seed: 1,
+  isPlayingBgm: true,
   isReplayEnabled: true,
   theme: "shape"
 };
@@ -195,7 +195,7 @@ function update() {
       var collider = char("b", G.PARADIST + relativeX, o.y).isColliding;
       if (!disappear) { 
         disappear = collider.char.a;
-        if (collider.char.a) { puck.speed -= 0.2; } 
+        if (collider.char.a) { puck.speed -= 0.2; play("hit"); } 
       }
     }
     return disappear;
@@ -332,7 +332,7 @@ function update() {
           distance = puck.pos.distanceTo(targetCenter);
           let score = 500 - distance - (floor(distance/target.innerRadius) * distance);
           clamp(score, 0, 1000);
-          if ((floor(distance/target.innerRadius) == 0)) { myAddScore(score * 2); } else { myAddScore(score); }
+          if ((floor(distance/target.innerRadius) == 0)) { myAddScore(score * 2); play("lucky"); } else { myAddScore(score); play("coin"); }
           //100 - distance - (floor(distance/innerRadius) * distance) - (floor(distance/outerRadius) * distance)
             //inner radius gets 2x multiplier
           }
